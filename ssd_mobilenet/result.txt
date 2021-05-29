@@ -1,0 +1,27 @@
+radv
+Mean Squared Error of output 0 and shape (1, 100, 4) is 1.0050814178055433e-14
+Mean Squared Error of output 1 and shape (1, 100) is 0.0
+Mean Squared Error of output 2 and shape (1, 100) is 5.052891698803519e-13
+Mean Squared Error of output 3 and shape (1,) is 0.0
+Mean Squared Error of output 4 and shape (1, 12804, 4) is 3.334544283490476e-13
+Mean Squared Error of output 5 and shape (1, 12804, 91) is 2.2198630788243653e-15
+[33.880326 34.66615  34.602414 34.669199 34.707832 33.636612 31.945262
+ 34.006943 34.564293 34.740946 34.623986 34.766348 34.713648 34.871325
+ 34.906143 35.009366 34.808564 34.818735 34.699258 34.808224 35.023151
+ 33.342045 32.006849 33.617912 34.771944 34.999326 34.919375 34.685295
+ 34.818686 34.922124]
+TVM VM mean inference time (std dev): 34.42 ms (0.78 ms)
+
+amdvlk
+Mean Squared Error of output 0 and shape (1, 100, 4) is 9.546322201703719e-15
+Mean Squared Error of output 1 and shape (1, 100) is 0.0
+Mean Squared Error of output 2 and shape (1, 100) is 4.472705571797325e-13
+Mean Squared Error of output 3 and shape (1,) is 0.0
+Mean Squared Error of output 4 and shape (1, 12804, 4) is 3.161924931951998e-13
+Mean Squared Error of output 5 and shape (1, 12804, 91) is 2.207090245496244e-15
+[65.144263 68.593139 68.499269 68.852424 68.487616 68.412668 68.706089
+ 68.270025 68.940278 68.48673  68.436693 69.172822 68.580809 68.617994
+ 68.448531 68.71942  68.63353  68.364664 68.887294 68.621929 68.669193
+ 68.324611 68.40767  68.458396 68.334888 68.608246 68.552014 68.287233
+ 68.584208 68.529255]
+TVM VM mean inference time (std dev): 68.45 ms (0.65 ms)
