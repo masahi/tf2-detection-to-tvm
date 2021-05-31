@@ -182,9 +182,9 @@ def convert_combined_nms(
     return _expr.Tuple(
         [
             nmsed_boxes,
+            _op.add(_op.cast(nmsed_classes, "float32"), _op.const(1, "float32")),
             nmsed_scores,
-            nmsed_classes,
-            num_detections,
+            _op.cast(num_detections, "float32"),
             raw_boxes,
             raw_scores,
         ]
