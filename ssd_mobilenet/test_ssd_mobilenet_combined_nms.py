@@ -152,57 +152,58 @@ mod, params = relay.frontend.from_onnx(onnx_model, shape_dict, freeze_params=Tru
 mod = relay.transform.DynamicToStatic()(mod)
 
 mod = rewrite_all_class_nms(mod)
+# print(mod)
 # print(relay.transform.InferType()(mod))
 
 # # Compile with VM
-with tvm.transform.PassContext(opt_level=3):
-    vm_exec = relay.vm.compile(mod, target, params=params)
-    # compiler = relay.vm.VMCompiler()
-    # opt_mod, _ = compiler.optimize(mod, target, params=params)
-    # print(opt_mod)
+# with tvm.transform.PassContext(opt_level=3):
+#     vm_exec = relay.vm.compile(mod, target, params=params)
+#     # compiler = relay.vm.VMCompiler()
+#     # opt_mod, _ = compiler.optimize(mod, target, params=params)
+#     # print(opt_mod)
 
-# from tvm.runtime import profiler_vm
-# vm = profiler_vm.VirtualMachineProfiler(vm_exec, dev)
+# # from tvm.runtime import profiler_vm
+# # vm = profiler_vm.VirtualMachineProfiler(vm_exec, dev)
 
-# report = vm.profile(input_dict[iname], func_name="main")
-# print(report)
+# # report = vm.profile(input_dict[iname], func_name="main")
+# # print(report)
 
-vm = VirtualMachine(vm_exec, dev)
+# vm = VirtualMachine(vm_exec, dev)
 
-# Run inference on sample data with TVM
-vm.set_input("main", **input_dict)  # required
-tvm_output = vm.run()
-tvm_output = [x.asnumpy() for x in tvm_output]
-ftimer = vm.module.time_evaluator(
-    "invoke", tvm.cpu(0), repeat=3, number=3
-)
-prof_res = np.array(ftimer("main").results) * 1000  # convert to millisecond
-# print("TVM VM mean inference time (std dev): %.2f ms (%.2f ms)" %
-#         (np.mean(prof_res), np.std(prof_res)))
+# # Run inference on sample data with TVM
+# vm.set_input("main", **input_dict)  # required
+# tvm_output = vm.run()
+# tvm_output = [x.asnumpy() for x in tvm_output]
+# ftimer = vm.module.time_evaluator(
+#     "invoke", tvm.cpu(0), repeat=3, number=3
+# )
+# prof_res = np.array(ftimer("main").results) * 1000  # convert to millisecond
+# # print("TVM VM mean inference time (std dev): %.2f ms (%.2f ms)" %
+# #         (np.mean(prof_res), np.std(prof_res)))
 
-# Check outputs
-assert(len(tvm_output)==len(ort_output))
-for i in range(len(tvm_output)):
-    assert(tvm_output[i].shape == ort_output[i].shape)
-    MSE = (np.square(tvm_output[i] - ort_output[i])).mean(axis=None)
-    print ("Mean Squared Error of output {} and shape {} is {}".format(i, tvm_output[i].shape, MSE))
-print(tvm_output[3], ort_output[3])
-# # Produce output
-detection_boxes = tvm_output[0][0]
-detection_scores = tvm_output[2][0]
-detection_classes = tvm_output[1][0]
+# # Check outputs
+# assert(len(tvm_output)==len(ort_output))
+# for i in range(len(tvm_output)):
+#     assert(tvm_output[i].shape == ort_output[i].shape)
+#     MSE = (np.square(tvm_output[i] - ort_output[i])).mean(axis=None)
+#     print ("Mean Squared Error of output {} and shape {} is {}".format(i, tvm_output[i].shape, MSE))
+# print(tvm_output[3], ort_output[3])
+# # # Produce output
+# detection_boxes = tvm_output[0][0]
+# detection_scores = tvm_output[2][0]
+# detection_classes = tvm_output[1][0]
 
-img = Image.open(img_path)
-draw = ImageDraw.Draw(img)
-for detection in range(len(detection_boxes)):
-    if detection_scores[detection] >= 0.2: # hardcoded threshold
-        c = detection_classes[detection] + 1
-        d = detection_boxes[detection]
-        draw_detection(draw, d, c)
+# img = Image.open(img_path)
+# draw = ImageDraw.Draw(img)
+# for detection in range(len(detection_boxes)):
+#     if detection_scores[detection] >= 0.2: # hardcoded threshold
+#         c = detection_classes[detection] + 1
+#         d = detection_boxes[detection]
+#         draw_detection(draw, d, c)
 
-# Write detection outptu to output.pdf
-plt.figure(figsize=(80, 40))
-plt.axis('off')
-plt.imshow(img)
-plt.savefig('output.pdf')
-print("Wrote output of object detection to output.pdf")
+# # Write detection outptu to output.pdf
+# plt.figure(figsize=(80, 40))
+# plt.axis('off')
+# plt.imshow(img)
+# plt.savefig('output.pdf')
+# print("Wrote output of object detection to output.pdf")
