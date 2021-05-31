@@ -130,7 +130,9 @@ iname = "input_tensor:0"
 ishape = (1, 300, 300, 3)
 mod_layout = "NHWC"
 dtype = "uint8"
-target = "vulkan -from_device=0"
+# target = "vulkan -from_device=0"
+target = "vulkan -supports_int8=1 -supports_int64=1 -supports_8bit_buffer=1 -supports_storage_buffer_storage_class=1"
+
 dev = tvm.device(target, 0)
 shape_dict = {iname: ishape}
 dtype_dict = {iname: dtype}
@@ -151,35 +153,43 @@ ort_output = ort_sess.run(None, onnx_input_dict)
 mod, params = relay.frontend.from_onnx(onnx_model, shape_dict, freeze_params=True)
 mod = relay.transform.DynamicToStatic()(mod)
 
-mod = rewrite_all_class_nms(mod)
-# print(mod)
-# print(relay.transform.InferType()(mod))
+do_write = True
 
-# Compile with VM
-with tvm.transform.PassContext(opt_level=3):
-    vm_exec = relay.vm.compile(mod, target, params=params)
-    # compiler = relay.vm.VMCompiler()
-    # opt_mod, _ = compiler.optimize(mod, target, params=params)
-    # print(opt_mod)
+if do_write:
+    mod = rewrite_all_class_nms(mod)
+    with tvm.transform.PassContext(opt_level=3):
+        json, lib, params = relay.build(mod, target=target, params=params)
 
-# from tvm.runtime import profiler_vm
-# vm = profiler_vm.VirtualMachineProfiler(vm_exec, dev)
+    # print(relay.transform.InferType()(mod))
+    ctx = tvm.device(target, 0)
+    runtime = tvm.contrib.graph_executor.create(json, lib, ctx)
+    runtime.set_input(**params)
+    runtime.set_input(iname, input_dict[iname])
+    runtime.run()
+    tvm_output = [runtime.get_output(i).numpy() for i in range(6)]
+else:
+    # Compile with VM
+    with tvm.transform.PassContext(opt_level=3):
+        vm_exec = relay.vm.compile(mod, target, params=params)
 
-# report = vm.profile(input_dict[iname], func_name="main")
-# print(report)
+    # from tvm.runtime import profiler_vm
+    # vm = profiler_vm.VirtualMachineProfiler(vm_exec, dev)
 
-vm = VirtualMachine(vm_exec, dev)
+    # report = vm.profile(input_dict[iname], func_name="main")
+    # print(report)
 
-# Run inference on sample data with TVM
-vm.set_input("main", **input_dict)  # required
-tvm_output = vm.run()
-tvm_output = [x.asnumpy() for x in tvm_output]
-ftimer = vm.module.time_evaluator(
-    "invoke", tvm.cpu(0), repeat=3, number=3
-)
-prof_res = np.array(ftimer("main").results) * 1000  # convert to millisecond
-# print("TVM VM mean inference time (std dev): %.2f ms (%.2f ms)" %
-#         (np.mean(prof_res), np.std(prof_res)))
+    vm = VirtualMachine(vm_exec, dev)
+
+    # Run inference on sample data with TVM
+    vm.set_input("main", **input_dict)  # required
+    tvm_output = vm.run()
+    tvm_output = [x.asnumpy() for x in tvm_output]
+    # ftimer = vm.module.time_evaluator(
+    #     "invoke", tvm.cpu(0), repeat=3, number=3
+    # )
+    # prof_res = np.array(ftimer("main").results) * 1000  # convert to millisecond
+    # print("TVM VM mean inference time (std dev): %.2f ms (%.2f ms)" %
+    #         (np.mean(prof_res), np.std(prof_res)))
 
 # Check outputs
 assert(len(tvm_output)==len(ort_output))
@@ -187,7 +197,7 @@ for i in range(len(tvm_output)):
     assert(tvm_output[i].shape == ort_output[i].shape)
     MSE = (np.square(tvm_output[i] - ort_output[i])).mean(axis=None)
     print ("Mean Squared Error of output {} and shape {} is {}".format(i, tvm_output[i].shape, MSE))
-print(tvm_output[3], ort_output[3])
+
 # # Produce output
 detection_boxes = tvm_output[0][0]
 detection_scores = tvm_output[2][0]
