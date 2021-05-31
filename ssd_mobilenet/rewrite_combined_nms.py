@@ -122,16 +122,6 @@ def convert_combined_nms(
         max_total_size,
         output_format="tensorflow",
     )
-    ret = _expr.TupleWrapper(
-        _expr.Tuple(
-            [
-             selected_indices, selected_scores, num_detections
-            ]
-        ),
-        3,
-    )
-    print("returning")
-    return ret
 
     box_range = _op.arange(
         _op.const(0, dtype="int64"),
@@ -189,18 +179,15 @@ def convert_combined_nms(
 
     nmsed_boxes = nmsed_boxes * _op.expand_dims(valid_mask, axis=2)
 
-    return _expr.TupleWrapper(
-        _expr.Tuple(
-            [
-                nmsed_boxes,
-                nmsed_scores,
-                nmsed_classes,
-                num_detections,
-                raw_boxes,
-                raw_scores,
-            ]
-        ),
-        6,
+    return _expr.Tuple(
+        [
+            nmsed_boxes,
+            nmsed_scores,
+            nmsed_classes,
+            num_detections,
+            raw_boxes,
+            raw_scores,
+        ]
     )
 
 
@@ -227,7 +214,6 @@ class AllClassNMSRewrite(DFPatternCallback):
         )
 
     def callback(self, pre, post, node_map):
-        print("matched")
         boxes = node_map[self.boxes][0]
         scores = node_map[self.scores][0]
         max_boxes_per_class = node_map[self.max_boxes_per_class][0]
@@ -236,7 +222,6 @@ class AllClassNMSRewrite(DFPatternCallback):
         raw_boxes = node_map[self.raw_boxes][0]
         raw_scores = node_map[self.raw_scores][0]
         max_output_boxes_per_batch = 90 * 12804  # TODO
-        print("rewriting")
         return convert_combined_nms(
             1,
             max_output_boxes_per_batch,
