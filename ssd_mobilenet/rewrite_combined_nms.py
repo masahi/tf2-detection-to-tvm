@@ -1,5 +1,6 @@
 from tvm.relay import op as _op
 from tvm.relay import expr as _expr
+from tvm.relay.frontend.tensorflow import convert_combined_nms_with_all_class
 from tvm.relay.dataflow_pattern import *
 
 
@@ -43,7 +44,6 @@ def combined_nms_pattern(
     v497 = is_op("expand_dims")(v496)
     v498 = is_tuple([v480, v497])
     v499 = is_op("concatenate")(v498)
-
     v500 = is_op("dyn.strided_slice")(
         selected_indices, wildcard(), num_detections, wildcard()
     )
@@ -70,7 +70,6 @@ def combined_nms_pattern(
     v521 = is_op("less")(v517, wildcard())
     v522 = is_op("add")(v517, v520)
     v523 = is_op("where")(v521, v522, v517)
-
     v524 = is_op("dyn.strided_slice")(
         selected_indices, wildcard(), num_detections, wildcard()
     )
@@ -84,7 +83,6 @@ def combined_nms_pattern(
     v532 = is_op("where")(v530, v531, v517)
     v533 = is_op("take")(v527, v532)
     v534 = is_op("cast")(v533)
-
     v535 = is_tuple_get_item(v509, 0)
     v536 = is_op("greater")(v515, wildcard())
     v537 = is_op("cast")(v536)
@@ -110,79 +108,26 @@ def convert_combined_nms(
     raw_scores,
 ):
     (
-        selected_indices,
-        selected_scores,
+        nmsed_boxes,
+        nmsed_scores,
+        nmsed_classes,
         num_detections,
-    ) = _op.vision.all_class_non_max_suppression(
+    ) = convert_combined_nms_with_all_class(
+        batch_size,
+        max_output_boxes_per_batch,
         boxes,
         scores,
         max_output_boxes_per_class,
         iou_threshold,
         score_threshold,
         max_total_size,
-        output_format="tensorflow",
+        clip_boxes,
     )
-
-    box_range = _op.arange(
-        _op.const(0, dtype="int64"),
-        _op.const(max_total_size, dtype="int64"),
-        dtype="int64",
-    )
-    tile_batch_reps = (
-        _op.concatenate([batch_size, 1])
-        if isinstance(batch_size, tvm.tir.Any)
-        else _op.const([batch_size, 1])
-    )
-    box_range_2d = _op.tile(box_range, tile_batch_reps)
-    valid_mask = _op.cast(
-        _op.less(box_range_2d, _op.expand_dims(num_detections, axis=1)), "float32"
-    )
-
-    def select_topk(do_zero_pad):
-        def true_branch():
-            arange = _op.arange(
-                _op.const(0, dtype="int64"),
-                _op.const(max_output_boxes_per_batch, dtype="int64"),
-                dtype="int64",
-            )
-            pad = _op.full(
-                _op.const(0, dtype="int64"),
-                (max_total_size - max_output_boxes_per_batch,),
-            )
-            topk_indices = _op.tile(_op.concatenate([arange, pad], 0), tile_batch_reps)
-            nmsed_scores = _op.gather(selected_scores, 1, topk_indices)
-            nmsed_scores = nmsed_scores * valid_mask
-            return nmsed_scores, topk_indices
-
-        def false_branch():
-            return _op.topk(selected_scores, k=max_total_size, axis=1, ret_type="both")
-
-        # TODO(masahi): support dynamic num_boxes
-        # return _expr.If(do_zero_pad, true_branch(), false_branch())
-        return true_branch() if do_zero_pad else false_branch()
-
-    assert isinstance(
-        max_output_boxes_per_batch, int
-    ), "dynamic number of boxes not supported yet."
-    nmsed_scores, topk_indices = select_topk(
-        max_output_boxes_per_batch < max_total_size
-    )
-
-    indices = _op.take(selected_indices, topk_indices, axis=1, batch_dims=1)
-    nmsed_box_indices = _op.take(indices, _op.const(1), axis=2)
-    nmsed_classes = _op.take(indices, _op.const(0), axis=2)
-    nmsed_boxes = _op.take(boxes, nmsed_box_indices, axis=1, batch_dims=1)
-
-    if clip_boxes:
-        nmsed_boxes = _op.maximum(nmsed_boxes, _expr.const(0, dtype="float32"))
-        nmsed_boxes = _op.minimum(nmsed_boxes, _expr.const(1, dtype="float32"))
-
-    nmsed_boxes = nmsed_boxes * _op.expand_dims(valid_mask, axis=2)
 
     return _expr.Tuple(
         [
             nmsed_boxes,
-            _op.add(_op.cast(nmsed_classes, "float32"), _op.const(1, "float32")),
+            _op.add(nmsed_classes, _op.const(1, "float32")),
             nmsed_scores,
             _op.cast(num_detections, "float32"),
             raw_boxes,

@@ -157,6 +157,7 @@ do_write = True
 
 if do_write:
     mod = rewrite_all_class_nms(mod)
+    print(relay.transform.InferType()(mod))
     with tvm.transform.PassContext(opt_level=3):
         json, lib, params = relay.build(mod, target=target, params=params)
 
