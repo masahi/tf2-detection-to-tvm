@@ -155,7 +155,7 @@ log_file = "radv_llvm.log"
 with auto_scheduler.ApplyHistoryBest(log_file):
     with tvm.transform.PassContext(opt_level=3, config={"relay.backend.use_auto_scheduler": True}):
 
-        profile = False
+        profile = True
         do_rewrite = True
 
         if do_rewrite:
@@ -171,8 +171,7 @@ with auto_scheduler.ApplyHistoryBest(log_file):
             if profile:
                 gr = debug_executor.create(json, lib, ctx)
 
-                data = np.random.rand(1, 1, 28, 28).astype("float32")
-                report = gr.profile(data=data)
+                report = gr.profile(data=input_dict[iname])
                 print(report)
             else:
                 ftimer = runtime.module.time_evaluator("run", ctx, number=1, repeat=20)

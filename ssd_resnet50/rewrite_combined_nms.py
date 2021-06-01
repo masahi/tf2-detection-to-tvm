@@ -97,6 +97,7 @@ def combined_nms_pattern(
 def convert_combined_nms(
     batch_size,
     max_output_boxes_per_batch,
+    num_class,
     boxes,
     scores,
     max_output_boxes_per_class,
@@ -115,6 +116,7 @@ def convert_combined_nms(
     ) = convert_combined_nms_with_all_class(
         batch_size,
         max_output_boxes_per_batch,
+        num_class,
         boxes,
         scores,
         max_output_boxes_per_class,
@@ -166,13 +168,14 @@ class AllClassNMSRewrite(DFPatternCallback):
         score_thres = node_map[self.score_threshold][0]
         raw_boxes = node_map[self.raw_boxes][0]
         raw_scores = node_map[self.raw_scores][0]
-        max_output_boxes_per_batch = 90 * 51150  # TODO
+        max_output_boxes_per_batch = 90 * 12804  # TODO
         return convert_combined_nms(
             1,
             max_output_boxes_per_batch,
+            90,
             boxes,
             scores,
-            max_boxes_per_class,
+            max_boxes_per_class.data.numpy().item(),
             iou_thres,
             score_thres,
             100,
