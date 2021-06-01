@@ -1,13 +1,14 @@
 import tvm
 from tvm import relay
 from tvm.runtime.vm import VirtualMachine
-from tvm import relay, auto_scheduler
+from tvm import auto_scheduler
+from rewrite_combined_nms import rewrite_all_class_nms
+from tvm.contrib.debugger import debug_executor
 
 import onnx
 import onnxruntime
 import numpy as np
-from PIL import Image, ImageDraw, ImageColor
-import matplotlib.pyplot as plt
+from PIL import Image
 
 # COCO categories
 category_map = {
@@ -126,7 +127,7 @@ iname = "input_tensor:0"
 ishape = (1, 300, 300, 3)
 mod_layout = "NHWC"
 dtype = "uint8"
-target = "vulkan"
+target = "vulkan -supports_int8=1 -supports_int64=1 -supports_8bit_buffer=1 -supports_storage_buffer_storage_class=1"
 ctx = tvm.device(target, 0)
 
 shape_dict = {iname: ishape}
@@ -146,40 +147,61 @@ onnx_model = onnx.load(model_path)
 mod, params = relay.frontend.from_onnx(onnx_model, shape_dict, freeze_params=True)
 mod = relay.transform.DynamicToStatic()(mod)
 
-log_file = "amdvlk.log"
+log_file = "radv_llvm.log"
 
 # auto_schedule(mod, params, log_file)
 
 with auto_scheduler.ApplyHistoryBest(log_file):
     with tvm.transform.PassContext(opt_level=3, config={"relay.backend.use_auto_scheduler": True}):
-        vm_exec = relay.vm.compile(mod, target, params=params)
 
-        vm = VirtualMachine(vm_exec, ctx)
+        profile = True
+        do_rewrite = False
 
-        vm.set_input("main", **input_dict)
-        tvm_output = vm.run()
-        tvm_output = [x.asnumpy() for x in tvm_output]
+        if do_rewrite:
+            mod = rewrite_all_class_nms(mod)
+            json, lib, params = relay.build(mod, target=target, params=params)
+            ctx = tvm.device(target, 0)
+            runtime = tvm.contrib.graph_executor.create(json, lib, ctx)
+            runtime.set_input(**params)
+            runtime.set_input(iname, input_dict[iname])
+            runtime.run()
+            tvm_output = [runtime.get_output(i).numpy() for i in range(6)]
 
-        # Check outputs
+            if profile:
+                gr = debug_executor.create(json, lib, ctx)
+
+                data = np.random.rand(1, 1, 28, 28).astype("float32")
+                report = gr.profile(data=data)
+                print(report)
+            else:
+                ftimer = runtime.module.time_evaluator("run", ctx, number=1, repeat=20)
+                prof_res = np.array(ftimer().results) * 1000
+                print(prof_res)
+                print(np.mean(prof_res))
+        else:
+            vm_exec = relay.vm.compile(mod, target, params=params)
+            vm = VirtualMachine(vm_exec, ctx)
+            vm.set_input("main", **input_dict)
+            tvm_output = vm.run()
+            tvm_output = [x.asnumpy() for x in tvm_output]
+
+            if profile:
+                from tvm.runtime import profiler_vm
+                vm = profiler_vm.VirtualMachineProfiler(vm_exec, ctx)
+                report = vm.profile([input_dict[iname]], func_name="main")
+                print(report)
+            else:
+                ftimer = vm.module.time_evaluator(
+                    "invoke", ctx, repeat=30, number=1
+                )
+
+                prof_res = np.array(ftimer("main").results) * 1000  # convert to millisecond
+                print(prof_res)
+                print("TVM VM mean inference time (std dev): %.2f ms (%.2f ms)" %
+                        (np.mean(prof_res), np.std(prof_res)))
+
         assert(len(tvm_output)==len(ort_output))
         for i in range(len(tvm_output)):
             assert(tvm_output[i].shape == ort_output[i].shape)
             MSE = (np.square(tvm_output[i] - ort_output[i])).mean(axis=None)
             print("Mean Squared Error of output {} and shape {} is {}".format(i, tvm_output[i].shape, MSE))
-
-        profile = False
-
-        if profile:
-            from tvm.runtime import profiler_vm
-            vm = profiler_vm.VirtualMachineProfiler(vm_exec, ctx)
-            report = vm.profile([input_dict[iname]], func_name="main")
-            print(report)
-        else:
-            ftimer = vm.module.time_evaluator(
-                "invoke", ctx, repeat=30, number=1
-            )
-
-            prof_res = np.array(ftimer("main").results) * 1000  # convert to millisecond
-            print(prof_res)
-            print("TVM VM mean inference time (std dev): %.2f ms (%.2f ms)" %
-                    (np.mean(prof_res), np.std(prof_res)))

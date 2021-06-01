@@ -1,0 +1,31 @@
+rewrite
+fused_topk                                                                                                    14,420.38    10.65
+                                                                                                                                                         float32[1, 4603500]$
+ float32[1, 100], int32[1, 100]                      ec050379db27679c  vulkan0                     1
+fused_nn_conv2d_add_maximum_minimum                                                                           13,565.97    10.02         NCHW
+                                                                                      float32[1, 256, 80, 80], float32[256, 256, 3, 3], float32[1, 256, 1, 1], float32[], fl$
+at32[], float32[1, 256, 80, 80]                      689178924979e709  vulkan0           OIHW      9
+fused_nn_conv2d_add_maximum_minimum_8                                                                         11,578.75     8.55         NCHW
+                                                                                      float32[1, 256, 40, 40], float32[256, 256, 3, 3], float32[1, 256, 1, 1], float32[], fl$
+at32[], float32[1, 256, 40, 40]                      2628620dcab5d409  vulkan0           OIHW     15
+fused_vision_all_class_non_max_suppression                                                                    11,286.45     8.33
+                                                                             float32[1, 51150, 4], float32[1, 90, 51150], int64[], float32[], float32[], int64[1, 4603500, 2$
+, float32[1, 4603500], int64[1]                      07e025d511437752  vulkan0                     1
+fused_nn_conv2d_add_10
+
+no rewrite, vm
+fused_vision_all_class_non_max_suppression                                                                    59,214.06    28.95
+                                                                                                        float32[1, 51150, 4], float32[1, 90, 51150], int64[], float32[], floa
+t32[], int64[4603500, 3], int64[1]                      6930ccacac99754d  vulkan0                     1
+fused_nn_conv2d_add_maximum_minimum_13                                                                        14,723.90     7.20         NCHW
+                                                                                         float32[1, 256, 80, 80], float32[256, 256, 3, 3], float32[1, 256, 1, 1], float32[],
+float32[], float32[1, 256, 80, 80]                      689178924979e709  vulkan0           OIHW      9
+fused_nn_conv2d_add_maximum_minimum_8                                                                         11,726.52     5.73         NCHW
+                                                                                         float32[1, 256, 40, 40], float32[256, 256, 3, 3], float32[1, 256, 1, 1], float32[],
+float32[], float32[1, 256, 40, 40]                      2628620dcab5d409  vulkan0           OIHW     15
+fused_scatter_nd_2                                                                                             6,899.43     3.37
+                                                                                                                                                    int64[1, 9000], int64[2,
+9000], int64[9000], int64[1, 9000]                      59b11d3f4defacf0  vulkan0                     1
+fused_scatter_nd_1                                                                                             6,558.15     3.21
+                                                                                                                                              float32[1, 9000], int64[2, 9000
+], float32[9000], float32[1, 9000]                      8db20e5be6fec485  vulkan0                     1
