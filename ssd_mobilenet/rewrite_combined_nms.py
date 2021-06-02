@@ -1,6 +1,6 @@
 from tvm.relay import op as _op
 from tvm.relay import expr as _expr
-from tvm.relay.frontend.tensorflow import convert_combined_nms_with_all_class
+from tvm.relay.frontend.tensorflow import convert_combined_nms_with_all_class_nms
 from tvm.relay.dataflow_pattern import *
 
 
@@ -113,7 +113,7 @@ def convert_combined_nms(
         nmsed_scores,
         nmsed_classes,
         num_detections,
-    ) = convert_combined_nms_with_all_class(
+    ) = convert_combined_nms_with_all_class_nms(
         batch_size,
         max_output_boxes_per_batch,
         num_class,
