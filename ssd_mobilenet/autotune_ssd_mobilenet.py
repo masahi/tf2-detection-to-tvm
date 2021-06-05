@@ -94,9 +94,7 @@ category_map = {
     90: 'toothbrush'
 }
 
-def auto_schedule(mod, params, log_file):
-    target = "vulkan"
-
+def auto_schedule(mod, params, log_file, target):
     tasks, task_weights = auto_scheduler.extract_tasks(mod, params, target)
 
     for idx, task in enumerate(tasks):
@@ -128,6 +126,7 @@ ishape = (1, 300, 300, 3)
 mod_layout = "NHWC"
 dtype = "uint8"
 target = "vulkan -supports_int8=1 -supports_int64=1 -supports_8bit_buffer=1 -supports_storage_buffer_storage_class=1"
+# target = "cuda"
 ctx = tvm.device(target, 0)
 
 shape_dict = {iname: ishape}
@@ -147,14 +146,14 @@ onnx_model = onnx.load(model_path)
 mod, params = relay.frontend.from_onnx(onnx_model, shape_dict, freeze_params=True)
 mod = relay.transform.DynamicToStatic()(mod)
 
-log_file = "radv_llvm.log"
+log_file = "vulkan_1070ti.log"
 
-# auto_schedule(mod, params, log_file)
+# auto_schedule(mod, params, log_file, target)
 
 with auto_scheduler.ApplyHistoryBest(log_file):
     with tvm.transform.PassContext(opt_level=3, config={"relay.backend.use_auto_scheduler": True}):
 
-        profile = True
+        profile = False
         do_rewrite = True
 
         if do_rewrite:

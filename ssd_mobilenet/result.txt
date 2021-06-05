@@ -37,3 +37,27 @@ Mean Squared Error of output 2 and shape (1, 100) is 5.052891698803519e-13
 Mean Squared Error of output 3 and shape (1,) is 0.0
 Mean Squared Error of output 4 and shape (1, 12804, 4) is 3.334544283490476e-13
 Mean Squared Error of output 5 and shape (1, 12804, 91) is 2.2198630788243653e-15
+
+cuda, rewrite
+[24.474433 23.477839 23.507441 23.270575 23.633742 23.480116 23.505625
+ 23.461714 21.3412   21.258462 21.261993 21.354958 21.297804 21.355238
+ 21.324017 21.255209 20.897791 20.865452 20.899798 20.895005]
+22.1409206
+Mean Squared Error of output 0 and shape (1, 100, 4) is 9.708345204953363e-15
+Mean Squared Error of output 1 and shape (1, 100) is 0.0
+Mean Squared Error of output 2 and shape (1, 100) is 4.768796577243883e-13
+Mean Squared Error of output 3 and shape (1,) is 0.0
+Mean Squared Error of output 4 and shape (1, 12804, 4) is 3.261245982467964e-13
+Mean Squared Error of output 5 and shape (1, 12804, 91) is 2.235833885044845e-15
+
+vk + 1070ti, rewrite
+[86.941145 81.085688 80.61752  80.795069 81.011132 80.969854 81.02274
+ 80.936045 81.071764 81.336924 80.970985 81.344773 80.908471 81.054958
+ 81.091939 81.199119 80.94198  80.738905 80.742035 80.745991]
+81.27635185
+Mean Squared Error of output 0 and shape (1, 100, 4) is 9.136614906215656e-15
+Mean Squared Error of output 1 and shape (1, 100) is 0.0
+Mean Squared Error of output 2 and shape (1, 100) is 4.75917645136742e-13
+Mean Squared Error of output 3 and shape (1,) is 0.0
+Mean Squared Error of output 4 and shape (1, 12804, 4) is 3.1014161508066684e-13
+Mean Squared Error of output 5 and shape (1, 12804, 91) is 2.183529812310129e-15
