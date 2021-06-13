@@ -1,6 +1,6 @@
 from tvm.relay import op as _op
 from tvm.relay import expr as _expr
-from tvm.relay.frontend.tensorflow import convert_combined_nms_with_all_class_nms
+from tvm.relay.frontend.tensorflow_ops import convert_combined_nms_with_all_class_nms
 from tvm.relay.dataflow_pattern import *
 
 
