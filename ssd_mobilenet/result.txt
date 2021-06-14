@@ -61,3 +61,15 @@ Mean Squared Error of output 2 and shape (1, 100) is 4.75917645136742e-13
 Mean Squared Error of output 3 and shape (1,) is 0.0
 Mean Squared Error of output 4 and shape (1, 12804, 4) is 3.1014161508066684e-13
 Mean Squared Error of output 5 and shape (1, 12804, 91) is 2.183529812310129e-15
+
+gen11, rewrite
+[83.149188 84.530088 80.347819 79.287336 80.774619 83.72371  81.094587
+ 78.168421 82.360954 77.045773 84.177389 81.676508 77.144302 80.51515
+ 83.846576 79.70089  80.916844 82.856785 81.774226 80.99649 ]
+81.20438275000001
+Mean Squared Error of output 0 and shape (1, 100, 4) is 9.018445339744208e-15
+Mean Squared Error of output 1 and shape (1, 100) is 0.0
+Mean Squared Error of output 2 and shape (1, 100) is 4.801220727414235e-13
+Mean Squared Error of output 3 and shape (1,) is 0.0
+Mean Squared Error of output 4 and shape (1, 12804, 4) is 3.0675576011621186e-13
+Mean Squared Error of output 5 and shape (1, 12804, 91) is 2.198415569325176e-15
