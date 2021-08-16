@@ -120,18 +120,20 @@ def draw_detection(draw, d, c):
 
 img_path = "../000000088462.jpg"
 image = Image.open(img_path)
-image = image.resize((300, 300))
+image = image.resize((320, 320))
 image = np.array(image)
 
 input_data = image[np.newaxis, :]
 
 model_path = "../models/ssd_mobilenet_v2_fpnlite_320x320_coco17_tpu-8_combined_nms.onnx"
 iname = "input_tensor:0"
-ishape = (1, 300, 300, 3)
+ishape = (1, 320, 320, 3)
 mod_layout = "NHWC"
-dtype = "uint8"
-# target = "vulkan -from_device=0"
-target = "vulkan -supports_int8=1 -supports_int64=1 -supports_8bit_buffer=1 -supports_storage_buffer_storage_class=1"
+dtype = "float32"
+target = "vulkan -from_device=0"
+# target = "vulkan -supports_int8=1 -supports_int64=1 -supports_8bit_buffer=1 -supports_storage_buffer_storage_class=1"
+
+# target = "llvm"
 
 dev = tvm.device(target, 0)
 shape_dict = {iname: ishape}
@@ -153,13 +155,24 @@ ort_output = ort_sess.run(None, onnx_input_dict)
 mod, params = relay.frontend.from_onnx(onnx_model, shape_dict, freeze_params=True)
 mod = relay.transform.DynamicToStatic()(mod)
 
+print(mod)
+# with tvm.transform.PassContext(opt_level=3):
+#     desired_layouts = {'nn.conv2d': ['NHWC', 'default']}
+#     seq = tvm.transform.Sequential([relay.transform.ConvertLayout(desired_layouts)])
+#     mod = seq(mod)
+
+# from tvm.relay.transform import InferType, ToMixedPrecision, mixed_precision
+# mod = ToMixedPrecision("float16")(mod)
+
 do_write = True
 
 if do_write:
     mod = rewrite_all_class_nms(mod)
-    print(relay.transform.InferType()(mod))
     with tvm.transform.PassContext(opt_level=3):
+        # opt_mod, _ = relay.optimize(mod, target=target, params=params)
+        # print(opt_mod)
         json, lib, params = relay.build(mod, target=target, params=params)
+
 
     # print(relay.transform.InferType()(mod))
     ctx = tvm.device(target, 0)
