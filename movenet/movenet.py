@@ -16,6 +16,7 @@ import tvm
 from tvm import relay
 
 import onnx
+import onnxruntime
 
 
 KEYPOINT_DICT = {
@@ -64,22 +65,6 @@ KEYPOINT_EDGE_INDS_TO_COLOR = {
 def _keypoints_and_edges_for_display(
     keypoints_with_scores, height, width, keypoint_threshold=0.11
 ):
-    """Returns high confidence keypoints and edges for visualization.
-
-    Args:
-      keypoints_with_scores: A numpy array with shape [1, 1, 17, 3] representing
-        the keypoint coordinates and scores returned from the MoveNet model.
-      height: height of the image in pixels.
-      width: width of the image in pixels.
-      keypoint_threshold: minimum confidence score for a keypoint to be
-        visualized.
-
-    Returns:
-      A (keypoints_xy, edges_xy, edge_colors) containing:
-        * the coordinates of all keypoints of all detected entities;
-        * the coordinates of all skeleton edges of all detected entities;
-        * the colors in which the edges should be plotted.
-    """
     keypoints_all = []
     keypoint_edges_all = []
     edge_colors = []
@@ -127,24 +112,6 @@ def draw_prediction_on_image(
     close_figure=False,
     output_image_height=None,
 ):
-    """Draws the keypoint predictions on image.
-
-    Args:
-      image: A numpy array with shape [height, width, channel] representing the
-        pixel values of the input image.
-      keypoints_with_scores: A numpy array with shape [1, 1, 17, 3] representing
-        the keypoint coordinates and scores returned from the MoveNet model.
-      crop_region: A dictionary that defines the coordinates of the bounding box
-        of the crop region in normalized coordinates (see the init_crop_region
-        function below for more detail). If provided, this function will also
-        draw the bounding box on the image.
-      output_image_height: An integer indicating the height of the output image.
-        Note that the image aspect ratio will be the same as the input image.
-
-    Returns:
-      A numpy array with shape [out_height, out_width, channel] representing the
-      image overlaid with keypoint predictions.
-    """
     height, width, channel = image.shape
     aspect_ratio = float(width) / height
     fig, ax = plt.subplots(figsize=(12 * aspect_ratio, 12))
@@ -190,6 +157,7 @@ def draw_prediction_on_image(
 
     fig.canvas.draw()
     image_from_plot = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    print(image_from_plot.shape, fig.canvas.get_width_height()[::-1] + (3,))
     image_from_plot = image_from_plot.reshape(
         fig.canvas.get_width_height()[::-1] + (3,)
     )
@@ -214,17 +182,6 @@ module = hub.load("https://tfhub.dev/google/movenet/singlepose/thunder/4")
 input_size = 256
 
 def movenet(input_image):
-    """Runs detection on an input image.
-
-    Args:
-      input_image: A [1, height, width, 3] tensor represents the input image
-        pixels. Note that the height/width should already be resized and match the
-        expected input resolution of the model before passing into this function.
-
-    Returns:
-      A [1, 1, 17, 3] float numpy array representing the predicted keypoint
-      coordinates and scores.
-    """
     model = module.signatures["serving_default"]
 
     # SavedModel format expects tensor type of int32.
@@ -251,16 +208,38 @@ def load_tvm_model():
 
     mod, params = relay.frontend.from_onnx(onnx_model, shape_dict, freeze_params=True)
     mod = relay.transform.DynamicToStatic()(mod)
-    print(relay.transform.InferType()(mod))
-    return mod
+    with tvm.transform.PassContext(opt_level=3):
+        desired_layouts = {'nn.conv2d': ['NHWC', 'default']}
+        seq = tvm.transform.Sequential([relay.transform.ConvertLayout(desired_layouts)])
+        mod = seq(mod)
 
-    # with tvm.transform.PassContext(opt_level=3):
-    #     desired_layouts = {'nn.conv2d': ['NHWC', 'default']}
-    #     seq = tvm.transform.Sequential([relay.transform.ConvertLayout(desired_layouts)])
-    #     mod = seq(mod)
+    with tvm.transform.PassContext(opt_level=3):
+        json, lib, params = relay.build(mod, target=target, params=params)
+
+    ctx = tvm.device(target, 0)
+    runtime = tvm.contrib.graph_executor.create(json, lib, ctx)
+    runtime.set_input(**params)
+    return runtime
 
 
-mod = load_tvm_model()
+def run_ort(ort_sess, input_image):
+    input_image = tf.cast(input_image, dtype=tf.int32)
+    onnx_input_dict = {"input": input_image.numpy()}
+    ort_output = ort_sess.run(None, onnx_input_dict)
+    return ort_output
+
+
+def run_tvm(runtime, input_image):
+    input_image = tf.cast(input_image, dtype=tf.int32)
+    runtime.set_input("input", input_image.numpy())
+    runtime.run()
+    return runtime.get_output(0).numpy()
+
+
+model_path = "../models/movenet_thunder.onnx"
+ort_sess = onnxruntime.InferenceSession(model_path)
+
+runtime = load_tvm_model()
 
 image_path = "input_image.jpeg"
 image = tf.io.read_file(image_path)
@@ -270,6 +249,8 @@ input_image = tf.expand_dims(image, axis=0)
 input_image = tf.image.resize_with_pad(input_image, input_size, input_size)
 
 keypoint_with_scores = movenet(input_image)
+keypoint_with_scores_ort = run_ort(ort_sess, input_image)
+keypoint_with_scores_tvm = run_tvm(runtime, input_image)
 
 display_image = tf.expand_dims(image, axis=0)
 display_image = tf.cast(
