@@ -195,7 +195,8 @@ def load_tvm_model():
     iname = "input"
     ishape = (1, 256, 256, 3)
     dtype = "int32"
-    target = "cuda"
+    # target = "cuda"
+    target = "llvm -mcpu=cascadelake"
 
     dev = tvm.device(target, 0)
     shape_dict = {iname: ishape}
@@ -204,11 +205,10 @@ def load_tvm_model():
     onnx_model = onnx.load(model_path)
 
     mod, params = relay.frontend.from_onnx(onnx_model, shape_dict, freeze_params=True)
-    mod = relay.transform.DynamicToStatic()(mod)
-    with tvm.transform.PassContext(opt_level=3):
-        desired_layouts = {'nn.conv2d': ['NHWC', 'default']}
-        seq = tvm.transform.Sequential([relay.transform.ConvertLayout(desired_layouts)])
-        mod = seq(mod)
+    # with tvm.transform.PassContext(opt_level=3):
+    #     desired_layouts = {'nn.conv2d': ['NHWC', 'default']}
+    #     seq = tvm.transform.Sequential([relay.transform.ConvertLayout(desired_layouts)])
+    #     mod = seq(mod)
 
     with tvm.transform.PassContext(opt_level=3):
         json, lib, params = relay.build(mod, target=target, params=params)
@@ -220,7 +220,7 @@ def load_tvm_model():
 
 
 def load_tvm_int8_model():
-    model_path = "/home/masa/tflite-models/movenet_tflite.onnx"
+    model_path = "../models/movenet_tflite.onnx"
     iname = "serving_default_input:0"
     shape_dict = {iname: [1,256,256,3]}
     dtype = "uint8"
@@ -254,20 +254,28 @@ def run_tvm(runtime, input_image):
     input_image = tf.cast(input_image, dtype=tf.int32)
     runtime.set_input("input", input_image.numpy())
     runtime.run()
-    return runtime.get_output(0).numpy()
+    out = runtime.get_output(0).numpy()
+    # ftimer = runtime.module.time_evaluator("run", tvm.cpu(0), number=1, repeat=50)
+    # prof_res = np.array(ftimer().results) * 1000
+    # print("FP32 time:", np.mean(prof_res))
+    return out
 
 
 def run_tvm_int8(runtime, input_image):
     input_image = tf.cast(input_image, dtype=tf.uint8)
     runtime.set_input("serving_default_input:0", input_image.numpy())
     runtime.run()
-    return runtime.get_output(0).numpy()
+    out = runtime.get_output(0).numpy()
+    # ftimer = runtime.module.time_evaluator("run", tvm.cpu(0), number=1, repeat=50)
+    # prof_res = np.array(ftimer().results) * 1000
+    # print("Int8 time:", np.mean(prof_res))
+    return out
 
 
 model_path = "../models/movenet_thunder.onnx"
 ort_sess = onnxruntime.InferenceSession(model_path)
 
-runtime = load_tvm_int8_model()
+
 
 image_path = "input_image.jpeg"
 image = tf.io.read_file(image_path)
@@ -278,7 +286,15 @@ input_image = tf.image.resize_with_pad(input_image, input_size, input_size)
 
 keypoint_with_scores = movenet(input_image)
 keypoint_with_scores_ort = run_ort(ort_sess, input_image)
-keypoint_with_scores_tvm = run_tvm_int8(runtime, input_image)
+
+use_int8 = True
+
+if use_int8:
+    runtime = load_tvm_int8_model()
+    keypoint_with_scores_tvm = run_tvm_int8(runtime, input_image)
+else:
+    runtime = load_tvm_model()
+    keypoint_with_scores_tvm = run_tvm(runtime, input_image)
 
 display_image = tf.expand_dims(image, axis=0)
 display_image = tf.cast(
@@ -291,7 +307,7 @@ output_overlay = draw_prediction_on_image(
 plt.figure(figsize=(5, 5))
 plt.imshow(output_overlay)
 _ = plt.axis("off")
-plt.show()
+# plt.show()
 
 
 # MIN_CROP_KEYPOINT_SCORE = 0.2
@@ -443,7 +459,11 @@ plt.show()
 #     )
 #     # Run model inference.
 #     # keypoints_with_scores = movenet(input_image)
-#     keypoints_with_scores = run_tvm(runtime, input_image)
+#     if use_int8:
+#         keypoints_with_scores = run_tvm_int8(runtime, input_image)
+#     else:
+#         keypoints_with_scores = run_tvm(runtime, input_image)
+
 #     # Update the coordinates.
 #     for idx in range(17):
 #         keypoints_with_scores[0, 0, idx, 0] = (
@@ -465,6 +485,7 @@ plt.show()
 
 # output_images = []
 # for frame_idx in range(num_frames):
+#     print(frame_idx)
 #     keypoints_with_scores = run_inference(
 #         movenet,
 #         image[frame_idx, :, :, :],
