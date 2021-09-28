@@ -129,7 +129,7 @@ model_path = "../models/ssd_mobilenet_v2_fpnlite_320x320_coco17_tpu-8_combined_n
 iname = "input_tensor:0"
 ishape = (1, 320, 320, 3)
 mod_layout = "NHWC"
-dtype = "float32"
+dtype = "uint8"
 target = "vulkan -from_device=0"
 # target = "vulkan -supports_int8=1 -supports_int64=1 -supports_8bit_buffer=1 -supports_storage_buffer_storage_class=1"
 
